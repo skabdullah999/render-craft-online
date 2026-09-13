@@ -582,18 +582,14 @@ function ObjectProperties({
           <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
             Material
           </p>
-          <label className="flex items-center justify-between text-xs text-muted-foreground">
-            Base color
-            <input
-              type="color"
-              defaultValue={`#${mat.color.getHexString()}`}
-              onChange={(e) => {
-                mat.color.set(e.target.value);
-                onChange();
-              }}
-              className="h-6 w-16 cursor-pointer rounded border border-border bg-transparent"
-            />
-          </label>
+          <ColorPicker
+            label="Base color"
+            value={`#${mat.color.getHexString()}`}
+            onChange={(hex) => {
+              mat.color.set(hex);
+              onChange();
+            }}
+          />
           <SliderRow
             label="Metallic"
             value={mat.metalness}
