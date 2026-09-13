@@ -220,6 +220,36 @@ export default function ModelEditor() {
     if (gridRef.current) gridRef.current.visible = showGrid;
   }, [showGrid]);
 
+  /* ---------------- point cage sync ---------------- */
+  useEffect(() => {
+    const h = handlesRef.current;
+    if (!h) return;
+    const obj = pointsOn && selected ? (objectsRef.current.get(selected) ?? null) : null;
+    h.attach(obj);
+    h.setMode(handleMode);
+    h.setVisible(pointsOn);
+    if (obj) {
+      const st = h.getState();
+      setHandlePlane(st.plane);
+      setCurve(st.curve);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected, pointsOn, items]);
+
+  useEffect(() => {
+    handlesRef.current?.setMode(handleMode);
+  }, [handleMode]);
+
+  useEffect(() => {
+    if (pointsOn) handlesRef.current?.setPlane(handlePlane);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [handlePlane]);
+
+  useEffect(() => {
+    if (pointsOn) handlesRef.current?.setCurve(curve);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [curve]);
+
   /* ---------------- object operations ---------------- */
   const addObject = useCallback((kind: Kind, source?: THREE.Object3D) => {
     const scene = sceneRef.current!;
