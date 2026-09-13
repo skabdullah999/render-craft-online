@@ -385,8 +385,31 @@ export class BoxHandles {
     const gv = local[v] / (obj.scale[v] || 1);
     const i = this.activeIndex;
 
+    const symmetric = e.ctrlKey || e.metaKey;
+
     if (this.mode === "free") {
       this.corners[i] = { h: gh, v: gv };
+    } else if (symmetric) {
+      // ctrl held: grow/shrink both sides around the centre
+      const s = (this.startCorners.length === 4 ? this.startCorners : this.corners).map((c) => ({ ...c }));
+      const cx = (s[0]!.h + s[1]!.h + s[2]!.h + s[3]!.h) / 4;
+      const cy = (s[0]!.v + s[1]!.v + s[2]!.v + s[3]!.v) / 4;
+      const dh = gh - cx;
+      const dv = gv - cy;
+      const a = s[(i + 1) % 4]!;
+      const cur = s[i]!;
+      const aSharesH = Math.abs(a.h - cur.h) <= Math.abs(a.v - cur.v);
+      const next: Corner[] = s;
+      next[i] = { h: cx + dh, v: cy + dv };
+      next[(i + 2) % 4] = { h: cx - dh, v: cy - dv };
+      if (aSharesH) {
+        next[(i + 1) % 4] = { h: cx + dh, v: cy - dv };
+        next[(i + 3) % 4] = { h: cx - dh, v: cy + dv };
+      } else {
+        next[(i + 1) % 4] = { h: cx - dh, v: cy + dv };
+        next[(i + 3) % 4] = { h: cx + dh, v: cy - dv };
+      }
+      this.corners = next;
     } else {
       // anchored resize: the opposite corner stays put, so dragging one side
       // only grows that side (it no longer mirrors to the other side)
