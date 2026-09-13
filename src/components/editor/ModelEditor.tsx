@@ -149,7 +149,7 @@ export default function ModelEditor() {
     };
     const onUp = (e: PointerEvent) => {
       if (Math.hypot(e.clientX - down.x, e.clientY - down.y) > 4) return;
-      if (transform.dragging) return;
+      if (transform.dragging || handles.dragging) return;
       const rect = renderer.domElement.getBoundingClientRect();
       pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
       pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
