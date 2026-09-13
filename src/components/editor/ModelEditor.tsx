@@ -475,6 +475,88 @@ export default function ModelEditor() {
             ))}
           </div>
 
+          <p className="px-1 pb-1 pt-4 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Point cage
+          </p>
+          <div className="space-y-1">
+            <button
+              onClick={() => setPointsOn((v) => !v)}
+              className={`flex w-full items-center gap-2 rounded-md border px-2 py-1.5 text-[11px] transition-colors ${
+                pointsOn
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border bg-secondary text-muted-foreground hover:bg-accent hover:text-foreground"
+              }`}
+            >
+              <Frame className="size-3.5" /> {pointsOn ? "Points on" : "4 points"}
+            </button>
+
+            {pointsOn && (
+              <>
+                <div className="grid grid-cols-3 gap-1">
+                  {(["xy", "xz", "zy"] as HandlePlane[]).map((p) => (
+                    <button
+                      key={p}
+                      onClick={() => setHandlePlane(p)}
+                      className={`rounded-md border py-1 text-[10px] uppercase transition-colors ${
+                        handlePlane === p
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-border bg-secondary text-muted-foreground hover:bg-accent"
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  ))}
+                </div>
+                <div className="grid grid-cols-2 gap-1">
+                  {(
+                    [
+                      ["linked", "Linked"],
+                      ["free", "Free"],
+                    ] as [HandleMode, string][]
+                  ).map(([m, lbl]) => (
+                    <button
+                      key={m}
+                      onClick={() => setHandleMode(m)}
+                      className={`rounded-md border py-1 text-[10px] transition-colors ${
+                        handleMode === m
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-border bg-secondary text-muted-foreground hover:bg-accent"
+                      }`}
+                    >
+                      {lbl}
+                    </button>
+                  ))}
+                </div>
+                <label className="block px-0.5 pt-1 text-[10px] text-muted-foreground">
+                  <span className="flex items-center justify-between">
+                    <span className="inline-flex items-center gap-1">
+                      <Spline className="size-3" /> Curve
+                    </span>
+                    <span className="font-mono">{curve.toFixed(2)}</span>
+                  </span>
+                  <input
+                    type="range"
+                    min={-1}
+                    max={1}
+                    step={0.01}
+                    value={curve}
+                    onChange={(e) => setCurve(parseFloat(e.target.value))}
+                    className="mt-1 w-full accent-primary"
+                  />
+                </label>
+                <button
+                  onClick={() => {
+                    handlesRef.current?.reset();
+                    setCurve(0);
+                  }}
+                  className="flex w-full items-center gap-2 rounded-md border border-border bg-secondary px-2 py-1.5 text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                >
+                  <RotateCcw className="size-3.5" /> Reset shape
+                </button>
+              </>
+            )}
+          </div>
+
           <div className="mt-4 space-y-1">
             <button
               onClick={duplicateSelected}
