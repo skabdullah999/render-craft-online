@@ -587,6 +587,41 @@ export default function ModelEditor() {
         {/* viewport */}
         <main className="relative min-w-0 flex-1">
           <div ref={mountRef} className="absolute inset-0" />
+
+          {quadMode && (
+            <div className="pointer-events-none absolute left-1/2 top-3 z-10 -translate-x-1/2 rounded-md border border-border bg-card/90 px-3 py-1.5 text-[11px] text-muted-foreground backdrop-blur">
+              Click 4 points in the viewport to build a quad ({quadCount}/4)
+            </div>
+          )}
+
+          {menu && (
+            <>
+              <div className="absolute inset-0 z-20" onPointerDown={() => setMenu(null)} />
+              <div
+                className="absolute z-30 w-48 overflow-hidden rounded-md border border-border bg-card py-1 shadow-xl"
+                style={{ left: menu.x, top: menu.y }}
+              >
+                {menuActions.map((a) =>
+                  a.sep ? (
+                    <div key={a.key} className="my-1 border-t border-border" />
+                  ) : (
+                    <button
+                      key={a.key}
+                      disabled={a.disabled}
+                      onClick={() => {
+                        a.run?.();
+                        setMenu(null);
+                      }}
+                      className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-40"
+                    >
+                      {a.icon}
+                      {a.label}
+                    </button>
+                  ),
+                )}
+              </div>
+            </>
+          )}
           {codeOpen && (
             <div className="absolute inset-y-0 right-0 z-10 w-[min(560px,60%)] overflow-auto border-l border-border bg-card/95 p-4 backdrop-blur">
               <pre className="whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed text-muted-foreground">
