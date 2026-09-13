@@ -124,13 +124,39 @@ export default function ModelEditor() {
     const orbit = new OrbitControls(camera, renderer.domElement);
     orbit.enableDamping = true;
     orbit.target.set(0, 0.5, 0);
+    orbitRef.current = orbit;
+
+    const snap = new SnapGuides();
+    scene.add(snap.group);
 
     const transform = new TransformControls(camera, renderer.domElement);
+    const safePos = new THREE.Vector3();
     transform.addEventListener("dragging-changed", (e) => {
       orbit.enabled = !e.value;
-      if (!e.value) tick();
+      const obj = transform.object as THREE.Object3D | undefined;
+      if (e.value && obj) safePos.copy(obj.position);
+      if (!e.value) {
+        snap.clear();
+        tick();
+      }
     });
-    transform.addEventListener("objectChange", tick);
+    transform.addEventListener("objectChange", () => {
+      const obj = transform.object as THREE.Object3D | undefined;
+      if (obj) {
+        const others = [...objectsRef.current.values()].filter(
+          (o) => o !== obj && (o as THREE.Mesh).isMesh,
+        );
+        if (snapOnRef.current && transform.getMode() === "translate") {
+          snap.apply(obj, others);
+        } else {
+          snap.clear();
+        }
+        const solids = others.filter((o) => o.userData['solid'] === true);
+        if (hitsSolid(obj, solids)) obj.position.copy(safePos);
+        else safePos.copy(obj.position);
+      }
+      tick();
+    });
     scene.add(transform.getHelper());
     transformRef.current = transform;
 
