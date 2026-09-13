@@ -760,7 +760,7 @@ export default function ModelEditor() {
                 <div className="grid grid-cols-2 gap-1">
                   {(
                     [
-                      ["linked", "Linked"],
+                      ["linked", "Anchor"],
                       ["free", "Free"],
                     ] as [HandleMode, string][]
                   ).map(([m, lbl]) => (
