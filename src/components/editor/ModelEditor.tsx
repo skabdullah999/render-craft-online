@@ -27,6 +27,11 @@ import {
   Spline,
   RotateCcw,
   Frame,
+  PenTool,
+  Magnet,
+  Shield,
+  ShieldOff,
+  Focus,
 } from "lucide-react";
 import {
   GEOMETRY_SPECS,
