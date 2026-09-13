@@ -37,6 +37,8 @@ import {
   type MeshKind,
 } from "./geometry";
 import { generateThreeCode } from "./exportCode";
+import { BoxHandles, type HandleMode, type HandlePlane } from "./handles";
+import ColorPicker from "./ColorPicker";
 
 type Item = { id: string; name: string; kind: Kind };
 type Mode = "translate" | "rotate" | "scale";
