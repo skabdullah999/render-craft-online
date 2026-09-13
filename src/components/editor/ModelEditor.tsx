@@ -199,6 +199,11 @@ export default function ModelEditor() {
       ro.disconnect();
       renderer.domElement.removeEventListener("pointerdown", onDown);
       renderer.domElement.removeEventListener("pointerup", onUp);
+      renderer.domElement.removeEventListener("contextmenu", onContext);
+      cancelQuadRef.current = null;
+      markerGeom.dispose();
+      markerMat.dispose();
+      snap.dispose();
       handles.dispose();
       transform.detach();
       transform.dispose();
