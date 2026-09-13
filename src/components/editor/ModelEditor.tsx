@@ -335,6 +335,153 @@ export default function ModelEditor() {
     if (item && obj) addObject(item.kind, obj);
   }, [items, addObject]);
 
+  /* ---------------- quad from 4 clicked points ---------------- */
+  const addQuadFromPoints = useCallback((pts: THREE.Vector3[]) => {
+    const scene = sceneRef.current!;
+    const centroid = new THREE.Vector3();
+    pts.forEach((p) => centroid.add(p));
+    centroid.multiplyScalar(1 / pts.length);
+
+    const arr = new Float32Array(12);
+    pts.forEach((p, i) => {
+      const l = p.clone().sub(centroid);
+      arr[i * 3] = l.x;
+      arr[i * 3 + 1] = l.y;
+      arr[i * 3 + 2] = l.z;
+    });
+    const geom = new THREE.BufferGeometry();
+    geom.setAttribute("position", new THREE.BufferAttribute(arr, 3));
+    geom.setIndex([0, 1, 2, 0, 2, 3]);
+    geom.computeVertexNormals();
+
+    const mesh = new THREE.Mesh(
+      geom,
+      new THREE.MeshStandardMaterial({
+        color: 0x8ab4ff,
+        metalness: 0.05,
+        roughness: 0.6,
+        side: THREE.DoubleSide,
+      }),
+    );
+    mesh.position.copy(centroid);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    mesh.userData['deformed'] = true;
+
+    const id = nextId();
+    objectsRef.current.set(id, mesh);
+    scene.add(mesh);
+    setItems((prev) => {
+      const same = prev.filter((p) => p.name.startsWith("Quad")).length;
+      return [...prev, { id, name: `Quad${same ? `.${same}` : ""}`, kind: "plane" as Kind }];
+    });
+    setSelected(id);
+  }, []);
+  addQuadRef.current = addQuadFromPoints;
+
+  /* ---------------- right click menu actions ---------------- */
+  const menuActions = useMemo(() => {
+    const id = menu?.id ?? null;
+    const obj = id ? (objectsRef.current.get(id) ?? null) : null;
+    const solid = obj?.userData['solid'] === true;
+    const list: {
+      key: string;
+      label?: string;
+      icon?: React.ReactNode;
+      run?: () => void;
+      disabled?: boolean;
+      sep?: boolean;
+    }[] = [
+      {
+        key: "move",
+        label: "Move (G)",
+        icon: <Move3d className="size-3.5" />,
+        disabled: !obj,
+        run: () => setMode("translate"),
+      },
+      {
+        key: "rotate",
+        label: "Rotate (R)",
+        icon: <Rotate3d className="size-3.5" />,
+        disabled: !obj,
+        run: () => setMode("rotate"),
+      },
+      {
+        key: "scale",
+        label: "Scale (S)",
+        icon: <Scaling className="size-3.5" />,
+        disabled: !obj,
+        run: () => setMode("scale"),
+      },
+      { key: "s1", sep: true },
+      {
+        key: "points",
+        label: pointsOn ? "Hide 4 points" : "Show 4 points",
+        icon: <Frame className="size-3.5" />,
+        disabled: !obj,
+        run: () => setPointsOn((v) => !v),
+      },
+      {
+        key: "solid",
+        label: solid ? "Make passable" : "Make solid",
+        icon: solid ? <ShieldOff className="size-3.5" /> : <Shield className="size-3.5" />,
+        disabled: !obj,
+        run: () => {
+          if (obj) obj.userData['solid'] = !solid;
+          tick();
+        },
+      },
+      {
+        key: "focus",
+        label: "Focus view",
+        icon: <Focus className="size-3.5" />,
+        disabled: !obj,
+        run: () => {
+          const orbit = orbitRef.current;
+          const cam = cameraRef.current;
+          if (!obj || !orbit || !cam) return;
+          const target = obj.getWorldPosition(new THREE.Vector3());
+          const dir = cam.position.clone().sub(orbit.target).normalize();
+          orbit.target.copy(target);
+          cam.position.copy(target).addScaledVector(dir, 6);
+        },
+      },
+      { key: "s2", sep: true },
+      {
+        key: "dup",
+        label: "Duplicate",
+        icon: <Copy className="size-3.5" />,
+        disabled: !obj,
+        run: duplicateSelected,
+      },
+      {
+        key: "del",
+        label: "Delete",
+        icon: <Trash2 className="size-3.5" />,
+        disabled: !obj,
+        run: removeSelected,
+      },
+      { key: "s3", sep: true },
+      {
+        key: "quad",
+        label: "Quad from 4 points",
+        icon: <PenTool className="size-3.5" />,
+        run: () => {
+          cancelQuadRef.current?.();
+          setQuadMode(true);
+        },
+      },
+      {
+        key: "grid",
+        label: showGrid ? "Hide grid" : "Show grid",
+        icon: <Grid3x3 className="size-3.5" />,
+        run: () => setShowGrid((v) => !v),
+      },
+    ];
+    return list;
+  }, [menu, pointsOn, showGrid, duplicateSelected, removeSelected, tick]);
+
+
   /* ---------------- keyboard shortcuts ---------------- */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
