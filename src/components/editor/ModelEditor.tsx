@@ -562,6 +562,35 @@ export default function ModelEditor() {
             )}
           </div>
 
+          <p className="px-1 pb-1 pt-4 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Tools
+          </p>
+          <div className="space-y-1">
+            <button
+              onClick={() => {
+                setQuadMode((v) => !v);
+                cancelQuadRef.current?.();
+              }}
+              className={`flex w-full items-center gap-2 rounded-md border px-2 py-1.5 text-[11px] transition-colors ${
+                quadMode
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border bg-secondary text-muted-foreground hover:bg-accent hover:text-foreground"
+              }`}
+            >
+              <PenTool className="size-3.5" /> {quadMode ? "Placing points" : "Quad from 4 pts"}
+            </button>
+            <button
+              onClick={() => setSnapOn((v) => !v)}
+              className={`flex w-full items-center gap-2 rounded-md border px-2 py-1.5 text-[11px] transition-colors ${
+                snapOn
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border bg-secondary text-muted-foreground hover:bg-accent hover:text-foreground"
+              }`}
+            >
+              <Magnet className="size-3.5" /> {snapOn ? "Snap on" : "Snap off"}
+            </button>
+          </div>
+
           <div className="mt-4 space-y-1">
             <button
               onClick={duplicateSelected}
