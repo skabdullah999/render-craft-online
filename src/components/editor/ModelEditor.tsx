@@ -78,6 +78,7 @@ export default function ModelEditor() {
   const objectsRef = useRef<Map<string, THREE.Object3D>>(new Map());
   const gridRef = useRef<THREE.GridHelper | null>(null);
   const selectedRef = useRef<string | null>(null);
+  const handlesRef = useRef<BoxHandles | null>(null);
 
   const [items, setItems] = useState<Item[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
