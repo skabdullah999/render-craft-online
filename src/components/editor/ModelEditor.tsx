@@ -24,6 +24,9 @@ import {
   Pill,
   Triangle,
   Code2,
+  Spline,
+  RotateCcw,
+  Frame,
 } from "lucide-react";
 import {
   GEOMETRY_SPECS,
