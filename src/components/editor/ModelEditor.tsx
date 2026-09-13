@@ -777,6 +777,9 @@ export default function ModelEditor() {
                     </button>
                   ))}
                 </div>
+                <p className="px-0.5 text-[9px] text-muted-foreground">
+                  Anchor mode-e Ctrl chepe tanle dui dik eksathe barbe.
+                </p>
                 <label className="block px-0.5 pt-1 text-[10px] text-muted-foreground">
                   <span className="flex items-center justify-between">
                     <span className="inline-flex items-center gap-1">
