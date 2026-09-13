@@ -24,6 +24,9 @@ import {
   Pill,
   Triangle,
   Code2,
+  Spline,
+  RotateCcw,
+  Frame,
 } from "lucide-react";
 import {
   GEOMETRY_SPECS,
@@ -34,6 +37,8 @@ import {
   type MeshKind,
 } from "./geometry";
 import { generateThreeCode } from "./exportCode";
+import { BoxHandles, type HandleMode, type HandlePlane } from "./handles";
+import ColorPicker from "./ColorPicker";
 
 type Item = { id: string; name: string; kind: Kind };
 type Mode = "translate" | "rotate" | "scale";
@@ -73,6 +78,7 @@ export default function ModelEditor() {
   const objectsRef = useRef<Map<string, THREE.Object3D>>(new Map());
   const gridRef = useRef<THREE.GridHelper | null>(null);
   const selectedRef = useRef<string | null>(null);
+  const handlesRef = useRef<BoxHandles | null>(null);
 
   const [items, setItems] = useState<Item[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
@@ -81,6 +87,10 @@ export default function ModelEditor() {
   const [, forceTick] = useState(0);
   const tick = useCallback(() => forceTick((t) => t + 1), []);
   const [codeOpen, setCodeOpen] = useState(false);
+  const [pointsOn, setPointsOn] = useState(false);
+  const [handlePlane, setHandlePlane] = useState<HandlePlane>("xy");
+  const [handleMode, setHandleMode] = useState<HandleMode>("linked");
+  const [curve, setCurve] = useState(0);
 
   selectedRef.current = selected;
 
@@ -119,6 +129,13 @@ export default function ModelEditor() {
     scene.add(transform.getHelper());
     transformRef.current = transform;
 
+    const handles = new BoxHandles(camera, renderer.domElement, tick, (d) => {
+      orbit.enabled = !d;
+      transform.enabled = !d;
+    });
+    scene.add(handles.group);
+    handlesRef.current = handles;
+
     // viewport helper lights so the scene is never pitch black
     const hemi = new THREE.HemisphereLight(0xbfd4ff, 0x20242b, 0.55);
     scene.add(hemi);
@@ -132,7 +149,7 @@ export default function ModelEditor() {
     };
     const onUp = (e: PointerEvent) => {
       if (Math.hypot(e.clientX - down.x, e.clientY - down.y) > 4) return;
-      if (transform.dragging) return;
+      if (transform.dragging || handles.dragging) return;
       const rect = renderer.domElement.getBoundingClientRect();
       pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
       pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
@@ -168,6 +185,7 @@ export default function ModelEditor() {
 
     renderer.setAnimationLoop(() => {
       orbit.update();
+      handles.update();
       renderer.render(scene, camera);
     });
 
@@ -176,6 +194,7 @@ export default function ModelEditor() {
       ro.disconnect();
       renderer.domElement.removeEventListener("pointerdown", onDown);
       renderer.domElement.removeEventListener("pointerup", onUp);
+      handles.dispose();
       transform.detach();
       transform.dispose();
       orbit.dispose();
@@ -200,6 +219,36 @@ export default function ModelEditor() {
   useEffect(() => {
     if (gridRef.current) gridRef.current.visible = showGrid;
   }, [showGrid]);
+
+  /* ---------------- point cage sync ---------------- */
+  useEffect(() => {
+    const h = handlesRef.current;
+    if (!h) return;
+    const obj = pointsOn && selected ? (objectsRef.current.get(selected) ?? null) : null;
+    h.attach(obj);
+    h.setMode(handleMode);
+    h.setVisible(pointsOn);
+    if (obj) {
+      const st = h.getState();
+      setHandlePlane(st.plane);
+      setCurve(st.curve);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected, pointsOn, items]);
+
+  useEffect(() => {
+    handlesRef.current?.setMode(handleMode);
+  }, [handleMode]);
+
+  useEffect(() => {
+    if (pointsOn) handlesRef.current?.setPlane(handlePlane);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [handlePlane]);
+
+  useEffect(() => {
+    if (pointsOn) handlesRef.current?.setCurve(curve);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [curve]);
 
   /* ---------------- object operations ---------------- */
   const addObject = useCallback((kind: Kind, source?: THREE.Object3D) => {
@@ -533,18 +582,14 @@ function ObjectProperties({
           <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
             Material
           </p>
-          <label className="flex items-center justify-between text-xs text-muted-foreground">
-            Base color
-            <input
-              type="color"
-              defaultValue={`#${mat.color.getHexString()}`}
-              onChange={(e) => {
-                mat.color.set(e.target.value);
-                onChange();
-              }}
-              className="h-6 w-16 cursor-pointer rounded border border-border bg-transparent"
-            />
-          </label>
+          <ColorPicker
+            label="Base color"
+            value={`#${mat.color.getHexString()}`}
+            onChange={(hex) => {
+              mat.color.set(hex);
+              onChange();
+            }}
+          />
           <SliderRow
             label="Metallic"
             value={mat.metalness}
@@ -586,18 +631,14 @@ function ObjectProperties({
           <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
             Light
           </p>
-          <label className="flex items-center justify-between text-xs text-muted-foreground">
-            Color
-            <input
-              type="color"
-              defaultValue={`#${light.color.getHexString()}`}
-              onChange={(e) => {
-                light.color.set(e.target.value);
-                onChange();
-              }}
-              className="h-6 w-16 cursor-pointer rounded border border-border bg-transparent"
-            />
-          </label>
+          <ColorPicker
+            label="Light color"
+            value={`#${light.color.getHexString()}`}
+            onChange={(hex) => {
+              light.color.set(hex);
+              onChange();
+            }}
+          />
           <SliderRow
             label="Power"
             max={item.kind === "pointLight" || item.kind === "spotLight" ? 60 : 10}
