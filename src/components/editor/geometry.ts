@@ -52,6 +52,6 @@ export function createGeometry(kind: MeshKind): THREE.BufferGeometry {
   const spec = GEOMETRY_SPECS[kind];
   const Ctor = (THREE as unknown as Record<string, new (...a: number[]) => THREE.BufferGeometry>)[
     spec.ctor
-  ];
+  ]!;
   return new Ctor(...spec.args);
 }
