@@ -654,6 +654,18 @@ function ObjectProperties({
     <div className="space-y-4">
       <div className="text-xs font-medium">{item.name}</div>
 
+      {!light && (
+        <ToggleRow
+          label="Solid (blocks others)"
+          value={object.userData['solid'] === true}
+          onChange={(v) => {
+            object.userData['solid'] = v;
+            onChange();
+          }}
+        />
+      )}
+
+
       {item.kind !== "ambientLight" && (
         <Vec3Row label="Location" v={object.position} step={0.1} onChange={onChange} />
       )}
