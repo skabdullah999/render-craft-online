@@ -360,6 +360,7 @@ export class BoxHandles {
     const hit = this.raycaster.intersectObjects(this.points, false)[0];
     if (!hit) return;
     this.activeIndex = hit.object.userData['handleIndex'] as number;
+    this.startCorners = this.corners.map((c) => ({ ...c }));
     ((hit.object as THREE.Mesh).material as THREE.MeshBasicMaterial).color.setHex(HANDLE_ACTIVE);
     const [, , n] = AXES[this.plane];
     const normal = new THREE.Vector3();
