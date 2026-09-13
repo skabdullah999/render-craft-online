@@ -301,12 +301,18 @@ export default function ModelEditor() {
   }, [removeSelected, duplicateSelected]);
 
   /* ---------------- default starter scene ---------------- */
+  const seeded = useRef(false);
   useEffect(() => {
-    addObject("box");
+    if (seeded.current) return;
+    seeded.current = true;
+    const cube = addObject("box");
     addObject("directionalLight");
     addObject("ambientLight");
+    setSelected(cube);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+
 
   /* ---------------- code export ---------------- */
   const code = useMemo(() => {
