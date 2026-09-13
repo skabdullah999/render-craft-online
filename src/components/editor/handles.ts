@@ -64,6 +64,7 @@ export class BoxHandles {
   private baseHalf = new THREE.Vector3(0.5, 0.5, 0.5);
   private center = new THREE.Vector3();
   private basePos: Float32Array | null = null;
+  private startCorners: Corner[] = [];
 
   constructor(
     private camera: THREE.Camera,
