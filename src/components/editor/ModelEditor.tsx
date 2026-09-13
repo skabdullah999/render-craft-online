@@ -143,7 +143,7 @@ export default function ModelEditor() {
         true,
       );
       if (hits.length) {
-        let obj: THREE.Object3D | null = hits[0].object;
+        let obj: THREE.Object3D | null = hits[0]!.object;
         while (obj && !targets.some(([, o]) => o === obj)) obj = obj.parent;
         const entry = targets.find(([, o]) => o === obj);
         setSelected(entry ? entry[0] : null);
