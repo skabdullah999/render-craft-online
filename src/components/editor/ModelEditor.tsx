@@ -84,6 +84,12 @@ export default function ModelEditor() {
   const gridRef = useRef<THREE.GridHelper | null>(null);
   const selectedRef = useRef<string | null>(null);
   const handlesRef = useRef<BoxHandles | null>(null);
+  const orbitRef = useRef<OrbitControls | null>(null);
+  const quadModeRef = useRef(false);
+  const snapOnRef = useRef(true);
+  const quadPtsRef = useRef<THREE.Vector3[]>([]);
+  const addQuadRef = useRef<((pts: THREE.Vector3[]) => void) | null>(null);
+  const cancelQuadRef = useRef<(() => void) | null>(null);
 
   const [items, setItems] = useState<Item[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
