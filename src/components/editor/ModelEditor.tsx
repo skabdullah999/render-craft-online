@@ -44,6 +44,7 @@ import {
 import { generateThreeCode } from "./exportCode";
 import { BoxHandles, type HandleMode, type HandlePlane } from "./handles";
 import ColorPicker from "./ColorPicker";
+import { SnapGuides, hitsSolid } from "./snapping";
 
 type Item = { id: string; name: string; kind: Kind };
 type Mode = "translate" | "rotate" | "scale";
@@ -84,6 +85,12 @@ export default function ModelEditor() {
   const gridRef = useRef<THREE.GridHelper | null>(null);
   const selectedRef = useRef<string | null>(null);
   const handlesRef = useRef<BoxHandles | null>(null);
+  const orbitRef = useRef<OrbitControls | null>(null);
+  const quadModeRef = useRef(false);
+  const snapOnRef = useRef(true);
+  const quadPtsRef = useRef<THREE.Vector3[]>([]);
+  const addQuadRef = useRef<((pts: THREE.Vector3[]) => void) | null>(null);
+  const cancelQuadRef = useRef<(() => void) | null>(null);
 
   const [items, setItems] = useState<Item[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
@@ -96,8 +103,14 @@ export default function ModelEditor() {
   const [handlePlane, setHandlePlane] = useState<HandlePlane>("xy");
   const [handleMode, setHandleMode] = useState<HandleMode>("linked");
   const [curve, setCurve] = useState(0);
+  const [quadMode, setQuadMode] = useState(false);
+  const [quadCount, setQuadCount] = useState(0);
+  const [snapOn, setSnapOn] = useState(true);
+  const [menu, setMenu] = useState<{ x: number; y: number; id: string | null } | null>(null);
 
   selectedRef.current = selected;
+  quadModeRef.current = quadMode;
+  snapOnRef.current = snapOn;
 
   /* ---------------- three.js bootstrap ---------------- */
   useEffect(() => {
@@ -124,13 +137,39 @@ export default function ModelEditor() {
     const orbit = new OrbitControls(camera, renderer.domElement);
     orbit.enableDamping = true;
     orbit.target.set(0, 0.5, 0);
+    orbitRef.current = orbit;
+
+    const snap = new SnapGuides();
+    scene.add(snap.group);
 
     const transform = new TransformControls(camera, renderer.domElement);
+    const safePos = new THREE.Vector3();
     transform.addEventListener("dragging-changed", (e) => {
       orbit.enabled = !e.value;
-      if (!e.value) tick();
+      const obj = transform.object as THREE.Object3D | undefined;
+      if (e.value && obj) safePos.copy(obj.position);
+      if (!e.value) {
+        snap.clear();
+        tick();
+      }
     });
-    transform.addEventListener("objectChange", tick);
+    transform.addEventListener("objectChange", () => {
+      const obj = transform.object as THREE.Object3D | undefined;
+      if (obj) {
+        const others = [...objectsRef.current.values()].filter(
+          (o) => o !== obj && (o as THREE.Mesh).isMesh,
+        );
+        if (snapOnRef.current && transform.getMode() === "translate") {
+          snap.apply(obj, others);
+        } else {
+          snap.clear();
+        }
+        const solids = others.filter((o) => o.userData['solid'] === true);
+        if (hitsSolid(obj, solids)) obj.position.copy(safePos);
+        else safePos.copy(obj.position);
+      }
+      tick();
+    });
     scene.add(transform.getHelper());
     transformRef.current = transform;
 
@@ -149,32 +188,86 @@ export default function ModelEditor() {
     const pointer = new THREE.Vector2();
     let down = { x: 0, y: 0 };
 
-    const onDown = (e: PointerEvent) => {
-      down = { x: e.clientX, y: e.clientY };
+    // quad tool scratch space
+    const quadGroup = new THREE.Group();
+    scene.add(quadGroup);
+    const markerGeom = new THREE.SphereGeometry(0.09, 18, 12);
+    const markerMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8, depthTest: false });
+    const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+    cancelQuadRef.current = () => {
+      quadPtsRef.current = [];
+      quadGroup.clear();
+      setQuadCount(0);
     };
-    const onUp = (e: PointerEvent) => {
-      if (Math.hypot(e.clientX - down.x, e.clientY - down.y) > 4) return;
-      if (transform.dragging || handles.dragging) return;
+
+    const setPointerFrom = (e: { clientX: number; clientY: number }) => {
       const rect = renderer.domElement.getBoundingClientRect();
       pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
       pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
       raycaster.setFromCamera(pointer, camera);
+      return rect;
+    };
+    const pickId = () => {
       const targets = [...objectsRef.current.entries()];
       const hits = raycaster.intersectObjects(
         targets.map(([, o]) => o),
         true,
       );
-      if (hits.length) {
-        let obj: THREE.Object3D | null = hits[0]!.object;
-        while (obj && !targets.some(([, o]) => o === obj)) obj = obj.parent;
-        const entry = targets.find(([, o]) => o === obj);
-        setSelected(entry ? entry[0] : null);
-      } else {
-        setSelected(null);
-      }
+      if (!hits.length) return { id: null as string | null, hits };
+      let obj: THREE.Object3D | null = hits[0]!.object;
+      while (obj && !targets.some(([, o]) => o === obj)) obj = obj.parent;
+      const entry = targets.find(([, o]) => o === obj);
+      return { id: entry ? entry[0] : null, hits };
     };
+
+    const onDown = (e: PointerEvent) => {
+      down = { x: e.clientX, y: e.clientY };
+    };
+    const onUp = (e: PointerEvent) => {
+      if (e.button !== 0) return;
+      if (Math.hypot(e.clientX - down.x, e.clientY - down.y) > 4) return;
+      if (transform.dragging || handles.dragging) return;
+      setPointerFrom(e);
+      const { id, hits } = pickId();
+
+      if (quadModeRef.current) {
+        let point: THREE.Vector3 | null = hits.length ? hits[0]!.point.clone() : null;
+        if (!point) {
+          const p = new THREE.Vector3();
+          point = raycaster.ray.intersectPlane(groundPlane, p) ? p.clone() : null;
+        }
+        if (!point) return;
+        const marker = new THREE.Mesh(markerGeom, markerMat);
+        marker.renderOrder = 999;
+        marker.position.copy(point);
+        quadGroup.add(marker);
+        quadPtsRef.current.push(point);
+        setQuadCount(quadPtsRef.current.length);
+        if (quadPtsRef.current.length === 4) {
+          const pts = quadPtsRef.current.slice();
+          quadPtsRef.current = [];
+          quadGroup.clear();
+          setQuadCount(0);
+          setQuadMode(false);
+          addQuadRef.current?.(pts);
+        }
+        return;
+      }
+
+      setSelected(id);
+    };
+
+    const onContext = (e: MouseEvent) => {
+      e.preventDefault();
+      const rect = setPointerFrom(e);
+      const { id } = pickId();
+      if (id) setSelected(id);
+      setMenu({ x: e.clientX - rect.left, y: e.clientY - rect.top, id });
+    };
+
     renderer.domElement.addEventListener("pointerdown", onDown);
     renderer.domElement.addEventListener("pointerup", onUp);
+    renderer.domElement.addEventListener("contextmenu", onContext);
 
     const resize = () => {
       const w = mount.clientWidth;
@@ -199,6 +292,11 @@ export default function ModelEditor() {
       ro.disconnect();
       renderer.domElement.removeEventListener("pointerdown", onDown);
       renderer.domElement.removeEventListener("pointerup", onUp);
+      renderer.domElement.removeEventListener("contextmenu", onContext);
+      cancelQuadRef.current = null;
+      markerGeom.dispose();
+      markerMat.dispose();
+      snap.dispose();
       handles.dispose();
       transform.detach();
       transform.dispose();
@@ -334,6 +432,153 @@ export default function ModelEditor() {
     const obj = objectsRef.current.get(id);
     if (item && obj) addObject(item.kind, obj);
   }, [items, addObject]);
+
+  /* ---------------- quad from 4 clicked points ---------------- */
+  const addQuadFromPoints = useCallback((pts: THREE.Vector3[]) => {
+    const scene = sceneRef.current!;
+    const centroid = new THREE.Vector3();
+    pts.forEach((p) => centroid.add(p));
+    centroid.multiplyScalar(1 / pts.length);
+
+    const arr = new Float32Array(12);
+    pts.forEach((p, i) => {
+      const l = p.clone().sub(centroid);
+      arr[i * 3] = l.x;
+      arr[i * 3 + 1] = l.y;
+      arr[i * 3 + 2] = l.z;
+    });
+    const geom = new THREE.BufferGeometry();
+    geom.setAttribute("position", new THREE.BufferAttribute(arr, 3));
+    geom.setIndex([0, 1, 2, 0, 2, 3]);
+    geom.computeVertexNormals();
+
+    const mesh = new THREE.Mesh(
+      geom,
+      new THREE.MeshStandardMaterial({
+        color: 0x8ab4ff,
+        metalness: 0.05,
+        roughness: 0.6,
+        side: THREE.DoubleSide,
+      }),
+    );
+    mesh.position.copy(centroid);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    mesh.userData['deformed'] = true;
+
+    const id = nextId();
+    objectsRef.current.set(id, mesh);
+    scene.add(mesh);
+    setItems((prev) => {
+      const same = prev.filter((p) => p.name.startsWith("Quad")).length;
+      return [...prev, { id, name: `Quad${same ? `.${same}` : ""}`, kind: "plane" as Kind }];
+    });
+    setSelected(id);
+  }, []);
+  addQuadRef.current = addQuadFromPoints;
+
+  /* ---------------- right click menu actions ---------------- */
+  const menuActions = useMemo(() => {
+    const id = menu?.id ?? null;
+    const obj = id ? (objectsRef.current.get(id) ?? null) : null;
+    const solid = obj?.userData['solid'] === true;
+    const list: {
+      key: string;
+      label?: string;
+      icon?: React.ReactNode;
+      run?: () => void;
+      disabled?: boolean;
+      sep?: boolean;
+    }[] = [
+      {
+        key: "move",
+        label: "Move (G)",
+        icon: <Move3d className="size-3.5" />,
+        disabled: !obj,
+        run: () => setMode("translate"),
+      },
+      {
+        key: "rotate",
+        label: "Rotate (R)",
+        icon: <Rotate3d className="size-3.5" />,
+        disabled: !obj,
+        run: () => setMode("rotate"),
+      },
+      {
+        key: "scale",
+        label: "Scale (S)",
+        icon: <Scaling className="size-3.5" />,
+        disabled: !obj,
+        run: () => setMode("scale"),
+      },
+      { key: "s1", sep: true },
+      {
+        key: "points",
+        label: pointsOn ? "Hide 4 points" : "Show 4 points",
+        icon: <Frame className="size-3.5" />,
+        disabled: !obj,
+        run: () => setPointsOn((v) => !v),
+      },
+      {
+        key: "solid",
+        label: solid ? "Make passable" : "Make solid",
+        icon: solid ? <ShieldOff className="size-3.5" /> : <Shield className="size-3.5" />,
+        disabled: !obj,
+        run: () => {
+          if (obj) obj.userData['solid'] = !solid;
+          tick();
+        },
+      },
+      {
+        key: "focus",
+        label: "Focus view",
+        icon: <Focus className="size-3.5" />,
+        disabled: !obj,
+        run: () => {
+          const orbit = orbitRef.current;
+          const cam = cameraRef.current;
+          if (!obj || !orbit || !cam) return;
+          const target = obj.getWorldPosition(new THREE.Vector3());
+          const dir = cam.position.clone().sub(orbit.target).normalize();
+          orbit.target.copy(target);
+          cam.position.copy(target).addScaledVector(dir, 6);
+        },
+      },
+      { key: "s2", sep: true },
+      {
+        key: "dup",
+        label: "Duplicate",
+        icon: <Copy className="size-3.5" />,
+        disabled: !obj,
+        run: duplicateSelected,
+      },
+      {
+        key: "del",
+        label: "Delete",
+        icon: <Trash2 className="size-3.5" />,
+        disabled: !obj,
+        run: removeSelected,
+      },
+      { key: "s3", sep: true },
+      {
+        key: "quad",
+        label: "Quad from 4 points",
+        icon: <PenTool className="size-3.5" />,
+        run: () => {
+          cancelQuadRef.current?.();
+          setQuadMode(true);
+        },
+      },
+      {
+        key: "grid",
+        label: showGrid ? "Hide grid" : "Show grid",
+        icon: <Grid3x3 className="size-3.5" />,
+        run: () => setShowGrid((v) => !v),
+      },
+    ];
+    return list;
+  }, [menu, pointsOn, showGrid, duplicateSelected, removeSelected, tick]);
+
 
   /* ---------------- keyboard shortcuts ---------------- */
   useEffect(() => {
@@ -515,7 +760,7 @@ export default function ModelEditor() {
                 <div className="grid grid-cols-2 gap-1">
                   {(
                     [
-                      ["linked", "Linked"],
+                      ["linked", "Anchor"],
                       ["free", "Free"],
                     ] as [HandleMode, string][]
                   ).map(([m, lbl]) => (
