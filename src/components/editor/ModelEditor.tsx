@@ -185,6 +185,7 @@ export default function ModelEditor() {
 
     renderer.setAnimationLoop(() => {
       orbit.update();
+      handles.update();
       renderer.render(scene, camera);
     });
 
