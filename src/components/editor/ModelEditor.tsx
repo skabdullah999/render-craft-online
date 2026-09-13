@@ -194,6 +194,7 @@ export default function ModelEditor() {
       ro.disconnect();
       renderer.domElement.removeEventListener("pointerdown", onDown);
       renderer.domElement.removeEventListener("pointerup", onUp);
+      handles.dispose();
       transform.detach();
       transform.dispose();
       orbit.dispose();
