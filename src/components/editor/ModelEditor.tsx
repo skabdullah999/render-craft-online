@@ -96,8 +96,14 @@ export default function ModelEditor() {
   const [handlePlane, setHandlePlane] = useState<HandlePlane>("xy");
   const [handleMode, setHandleMode] = useState<HandleMode>("linked");
   const [curve, setCurve] = useState(0);
+  const [quadMode, setQuadMode] = useState(false);
+  const [quadCount, setQuadCount] = useState(0);
+  const [snapOn, setSnapOn] = useState(true);
+  const [menu, setMenu] = useState<{ x: number; y: number; id: string | null } | null>(null);
 
   selectedRef.current = selected;
+  quadModeRef.current = quadMode;
+  snapOnRef.current = snapOn;
 
   /* ---------------- three.js bootstrap ---------------- */
   useEffect(() => {
