@@ -129,6 +129,13 @@ export default function ModelEditor() {
     scene.add(transform.getHelper());
     transformRef.current = transform;
 
+    const handles = new BoxHandles(camera, renderer.domElement, tick, (d) => {
+      orbit.enabled = !d;
+      transform.enabled = !d;
+    });
+    scene.add(handles.group);
+    handlesRef.current = handles;
+
     // viewport helper lights so the scene is never pitch black
     const hemi = new THREE.HemisphereLight(0xbfd4ff, 0x20242b, 0.55);
     scene.add(hemi);
