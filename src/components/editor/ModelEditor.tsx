@@ -254,6 +254,7 @@ export default function ModelEditor() {
       return [...prev, { id, name: `${labelFor(kind)}${same ? `.${same}` : ""}`, kind }];
     });
     setSelected(id);
+    return id;
   }, []);
 
   const removeSelected = useCallback(() => {
