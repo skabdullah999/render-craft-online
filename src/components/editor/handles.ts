@@ -64,6 +64,7 @@ export class BoxHandles {
   private baseHalf = new THREE.Vector3(0.5, 0.5, 0.5);
   private center = new THREE.Vector3();
   private basePos: Float32Array | null = null;
+  private startCorners: Corner[] = [];
 
   constructor(
     private camera: THREE.Camera,
@@ -359,6 +360,7 @@ export class BoxHandles {
     const hit = this.raycaster.intersectObjects(this.points, false)[0];
     if (!hit) return;
     this.activeIndex = hit.object.userData['handleIndex'] as number;
+    this.startCorners = this.corners.map((c) => ({ ...c }));
     ((hit.object as THREE.Mesh).material as THREE.MeshBasicMaterial).color.setHex(HANDLE_ACTIVE);
     const [, , n] = AXES[this.plane];
     const normal = new THREE.Vector3();
@@ -386,16 +388,28 @@ export class BoxHandles {
     if (this.mode === "free") {
       this.corners[i] = { h: gh, v: gv };
     } else {
-      const ch = this.center[h];
-      const cv = this.center[v];
-      const hw = Math.max(Math.abs(gh - ch), 0.02);
-      const vh = Math.max(Math.abs(gv - cv), 0.02);
-      this.corners = [
-        { h: ch - hw, v: cv - vh },
-        { h: ch + hw, v: cv - vh },
-        { h: ch + hw, v: cv + vh },
-        { h: ch - hw, v: cv + vh },
-      ];
+      // anchored resize: the opposite corner stays put, so dragging one side
+      // only grows that side (it no longer mirrors to the other side)
+      const start = this.startCorners.length === 4 ? this.startCorners : this.corners;
+      const s = start.map((c) => ({ ...c }));
+      const opp = s[(i + 2) % 4]!;
+      const a = s[(i + 1) % 4]!;
+      const b = s[(i + 3) % 4]!;
+      const cur = s[i]!;
+      // which neighbour shares the horizontal edge with the dragged corner
+      const aSharesH = Math.abs(a.h - cur.h) <= Math.abs(a.v - cur.v);
+      const next: Corner[] = s;
+      next[i] = { h: gh, v: gv };
+      next[(i + 2) % 4] = { h: opp.h, v: opp.v };
+      if (aSharesH) {
+        next[(i + 1) % 4] = { h: gh, v: opp.v };
+        next[(i + 3) % 4] = { h: opp.h, v: gv };
+      } else {
+        next[(i + 1) % 4] = { h: opp.h, v: gv };
+        next[(i + 3) % 4] = { h: gh, v: opp.v };
+      }
+      void b;
+      this.corners = next;
     }
 
     this.saveState();

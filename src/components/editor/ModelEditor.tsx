@@ -27,6 +27,11 @@ import {
   Spline,
   RotateCcw,
   Frame,
+  PenTool,
+  Magnet,
+  Shield,
+  ShieldOff,
+  Focus,
 } from "lucide-react";
 import {
   GEOMETRY_SPECS,
@@ -557,6 +562,35 @@ export default function ModelEditor() {
             )}
           </div>
 
+          <p className="px-1 pb-1 pt-4 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Tools
+          </p>
+          <div className="space-y-1">
+            <button
+              onClick={() => {
+                setQuadMode((v) => !v);
+                cancelQuadRef.current?.();
+              }}
+              className={`flex w-full items-center gap-2 rounded-md border px-2 py-1.5 text-[11px] transition-colors ${
+                quadMode
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border bg-secondary text-muted-foreground hover:bg-accent hover:text-foreground"
+              }`}
+            >
+              <PenTool className="size-3.5" /> {quadMode ? "Placing points" : "Quad from 4 pts"}
+            </button>
+            <button
+              onClick={() => setSnapOn((v) => !v)}
+              className={`flex w-full items-center gap-2 rounded-md border px-2 py-1.5 text-[11px] transition-colors ${
+                snapOn
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border bg-secondary text-muted-foreground hover:bg-accent hover:text-foreground"
+              }`}
+            >
+              <Magnet className="size-3.5" /> {snapOn ? "Snap on" : "Snap off"}
+            </button>
+          </div>
+
           <div className="mt-4 space-y-1">
             <button
               onClick={duplicateSelected}
@@ -582,6 +616,41 @@ export default function ModelEditor() {
         {/* viewport */}
         <main className="relative min-w-0 flex-1">
           <div ref={mountRef} className="absolute inset-0" />
+
+          {quadMode && (
+            <div className="pointer-events-none absolute left-1/2 top-3 z-10 -translate-x-1/2 rounded-md border border-border bg-card/90 px-3 py-1.5 text-[11px] text-muted-foreground backdrop-blur">
+              Click 4 points in the viewport to build a quad ({quadCount}/4)
+            </div>
+          )}
+
+          {menu && (
+            <>
+              <div className="absolute inset-0 z-20" onPointerDown={() => setMenu(null)} />
+              <div
+                className="absolute z-30 w-48 overflow-hidden rounded-md border border-border bg-card py-1 shadow-xl"
+                style={{ left: menu.x, top: menu.y }}
+              >
+                {menuActions.map((a) =>
+                  a.sep ? (
+                    <div key={a.key} className="my-1 border-t border-border" />
+                  ) : (
+                    <button
+                      key={a.key}
+                      disabled={a.disabled}
+                      onClick={() => {
+                        a.run?.();
+                        setMenu(null);
+                      }}
+                      className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-40"
+                    >
+                      {a.icon}
+                      {a.label}
+                    </button>
+                  ),
+                )}
+              </div>
+            </>
+          )}
           {codeOpen && (
             <div className="absolute inset-y-0 right-0 z-10 w-[min(560px,60%)] overflow-auto border-l border-border bg-card/95 p-4 backdrop-blur">
               <pre className="whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed text-muted-foreground">
@@ -648,6 +717,18 @@ function ObjectProperties({
   return (
     <div className="space-y-4">
       <div className="text-xs font-medium">{item.name}</div>
+
+      {!light && (
+        <ToggleRow
+          label="Solid (blocks others)"
+          value={object.userData['solid'] === true}
+          onChange={(v) => {
+            object.userData['solid'] = v;
+            onChange();
+          }}
+        />
+      )}
+
 
       {item.kind !== "ambientLight" && (
         <Vec3Row label="Location" v={object.position} step={0.1} onChange={onChange} />
