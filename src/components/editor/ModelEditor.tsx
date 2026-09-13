@@ -631,18 +631,14 @@ function ObjectProperties({
           <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
             Light
           </p>
-          <label className="flex items-center justify-between text-xs text-muted-foreground">
-            Color
-            <input
-              type="color"
-              defaultValue={`#${light.color.getHexString()}`}
-              onChange={(e) => {
-                light.color.set(e.target.value);
-                onChange();
-              }}
-              className="h-6 w-16 cursor-pointer rounded border border-border bg-transparent"
-            />
-          </label>
+          <ColorPicker
+            label="Light color"
+            value={`#${light.color.getHexString()}`}
+            onChange={(hex) => {
+              light.color.set(hex);
+              onChange();
+            }}
+          />
           <SliderRow
             label="Power"
             max={item.kind === "pointLight" || item.kind === "spotLight" ? 60 : 10}
