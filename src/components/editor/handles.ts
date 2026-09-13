@@ -271,15 +271,44 @@ export class BoxHandles {
     const cv = this.center[v];
     const out = new THREE.Vector2();
 
+    // Anchor mode keeps the original centre as a fixed seam. Moving the left,
+    // right, top, or bottom edge therefore stretches only that half instead of
+    // rescaling the whole object through its opposite half.
+    const anchoredFlat = this.mode === "linked" && Math.abs(this.curve) < 1e-8;
+    const left = (this.corners[0]!.h + this.corners[3]!.h) * 0.5;
+    const right = (this.corners[1]!.h + this.corners[2]!.h) * 0.5;
+    const bottom = (this.corners[0]!.v + this.corners[1]!.v) * 0.5;
+    const top = (this.corners[2]!.v + this.corners[3]!.v) * 0.5;
+
+    const mapAnchored = (
+      value: number,
+      midpoint: number,
+      half: number,
+      low: number,
+      high: number,
+    ) => {
+      if (value <= midpoint) {
+        const f = clamp01((value - (midpoint - half)) / half);
+        return THREE.MathUtils.lerp(low, midpoint, f);
+      }
+      const f = clamp01((value - midpoint) / half);
+      return THREE.MathUtils.lerp(midpoint, high, f);
+    };
+
     for (let i = 0; i < base.length; i += 3) {
       arr[i] = base[i]!;
       arr[i + 1] = base[i + 1]!;
       arr[i + 2] = base[i + 2]!;
-      const u = clamp01((base[i + hi]! - ch) / (2 * hw) + 0.5);
-      const t = clamp01((base[i + vi]! - cv) / (2 * vh) + 0.5);
-      this.evalCage(u, t, out);
-      arr[i + hi] = out.x;
-      arr[i + vi] = out.y;
+      if (anchoredFlat) {
+        arr[i + hi] = mapAnchored(base[i + hi]!, ch, hw, left, right);
+        arr[i + vi] = mapAnchored(base[i + vi]!, cv, vh, bottom, top);
+      } else {
+        const u = clamp01((base[i + hi]! - ch) / (2 * hw) + 0.5);
+        const t = clamp01((base[i + vi]! - cv) / (2 * vh) + 0.5);
+        this.evalCage(u, t, out);
+        arr[i + hi] = out.x;
+        arr[i + vi] = out.y;
+      }
     }
     attr.needsUpdate = true;
     mesh.geometry.computeVertexNormals();
