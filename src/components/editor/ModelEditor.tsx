@@ -87,6 +87,10 @@ export default function ModelEditor() {
   const [, forceTick] = useState(0);
   const tick = useCallback(() => forceTick((t) => t + 1), []);
   const [codeOpen, setCodeOpen] = useState(false);
+  const [pointsOn, setPointsOn] = useState(false);
+  const [handlePlane, setHandlePlane] = useState<HandlePlane>("xy");
+  const [handleMode, setHandleMode] = useState<HandleMode>("linked");
+  const [curve, setCurve] = useState(0);
 
   selectedRef.current = selected;
 
