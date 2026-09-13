@@ -149,32 +149,86 @@ export default function ModelEditor() {
     const pointer = new THREE.Vector2();
     let down = { x: 0, y: 0 };
 
-    const onDown = (e: PointerEvent) => {
-      down = { x: e.clientX, y: e.clientY };
+    // quad tool scratch space
+    const quadGroup = new THREE.Group();
+    scene.add(quadGroup);
+    const markerGeom = new THREE.SphereGeometry(0.09, 18, 12);
+    const markerMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8, depthTest: false });
+    const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+    cancelQuadRef.current = () => {
+      quadPtsRef.current = [];
+      quadGroup.clear();
+      setQuadCount(0);
     };
-    const onUp = (e: PointerEvent) => {
-      if (Math.hypot(e.clientX - down.x, e.clientY - down.y) > 4) return;
-      if (transform.dragging || handles.dragging) return;
+
+    const setPointerFrom = (e: { clientX: number; clientY: number }) => {
       const rect = renderer.domElement.getBoundingClientRect();
       pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
       pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
       raycaster.setFromCamera(pointer, camera);
+      return rect;
+    };
+    const pickId = () => {
       const targets = [...objectsRef.current.entries()];
       const hits = raycaster.intersectObjects(
         targets.map(([, o]) => o),
         true,
       );
-      if (hits.length) {
-        let obj: THREE.Object3D | null = hits[0]!.object;
-        while (obj && !targets.some(([, o]) => o === obj)) obj = obj.parent;
-        const entry = targets.find(([, o]) => o === obj);
-        setSelected(entry ? entry[0] : null);
-      } else {
-        setSelected(null);
-      }
+      if (!hits.length) return { id: null as string | null, hits };
+      let obj: THREE.Object3D | null = hits[0]!.object;
+      while (obj && !targets.some(([, o]) => o === obj)) obj = obj.parent;
+      const entry = targets.find(([, o]) => o === obj);
+      return { id: entry ? entry[0] : null, hits };
     };
+
+    const onDown = (e: PointerEvent) => {
+      down = { x: e.clientX, y: e.clientY };
+    };
+    const onUp = (e: PointerEvent) => {
+      if (e.button !== 0) return;
+      if (Math.hypot(e.clientX - down.x, e.clientY - down.y) > 4) return;
+      if (transform.dragging || handles.dragging) return;
+      setPointerFrom(e);
+      const { id, hits } = pickId();
+
+      if (quadModeRef.current) {
+        let point: THREE.Vector3 | null = hits.length ? hits[0]!.point.clone() : null;
+        if (!point) {
+          const p = new THREE.Vector3();
+          point = raycaster.ray.intersectPlane(groundPlane, p) ? p.clone() : null;
+        }
+        if (!point) return;
+        const marker = new THREE.Mesh(markerGeom, markerMat);
+        marker.renderOrder = 999;
+        marker.position.copy(point);
+        quadGroup.add(marker);
+        quadPtsRef.current.push(point);
+        setQuadCount(quadPtsRef.current.length);
+        if (quadPtsRef.current.length === 4) {
+          const pts = quadPtsRef.current.slice();
+          quadPtsRef.current = [];
+          quadGroup.clear();
+          setQuadCount(0);
+          setQuadMode(false);
+          addQuadRef.current?.(pts);
+        }
+        return;
+      }
+
+      setSelected(id);
+    };
+
+    const onContext = (e: MouseEvent) => {
+      e.preventDefault();
+      const rect = setPointerFrom(e);
+      const { id } = pickId();
+      if (id) setSelected(id);
+      setMenu({ x: e.clientX - rect.left, y: e.clientY - rect.top, id });
+    };
+
     renderer.domElement.addEventListener("pointerdown", onDown);
     renderer.domElement.addEventListener("pointerup", onUp);
+    renderer.domElement.addEventListener("contextmenu", onContext);
 
     const resize = () => {
       const w = mount.clientWidth;
