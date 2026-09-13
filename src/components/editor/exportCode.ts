@@ -54,8 +54,37 @@ export function generateThreeCode(items: ExportItem[], background: string) {
       const mesh = o as THREE.Mesh;
       const mat = mesh.material as THREE.MeshStandardMaterial;
       const spec = GEOMETRY_SPECS[item.kind as keyof typeof GEOMETRY_SPECS];
+      const deformed = mesh.userData['deformed'] === true;
+      if (deformed) {
+        const pos = mesh.geometry.getAttribute("position");
+        const norm = mesh.geometry.getAttribute("normal");
+        const index = mesh.geometry.getIndex();
+        const fmt = (a: ArrayLike<number>) =>
+          Array.from(a as ArrayLike<number>)
+            .map((x) => n(x))
+            .join(",");
+        lines.push(`  // edited with the point cage — vertices are baked in`);
+        lines.push(`  const ${v}_geometry = new THREE.BufferGeometry();`);
+        lines.push(
+          `  ${v}_geometry.setAttribute("position", new THREE.Float32BufferAttribute([${fmt(pos.array as ArrayLike<number>)}], 3));`,
+        );
+        if (norm) {
+          lines.push(
+            `  ${v}_geometry.setAttribute("normal", new THREE.Float32BufferAttribute([${fmt(norm.array as ArrayLike<number>)}], 3));`,
+          );
+        }
+        if (index) {
+          lines.push(
+            `  ${v}_geometry.setIndex([${Array.from(index.array as ArrayLike<number>).join(",")}]);`,
+          );
+        }
+      }
       lines.push(`  const ${v} = new THREE.Mesh(`);
-      lines.push(`    new THREE.${spec.ctor}(${spec.args.map(n).join(", ")}),`);
+      lines.push(
+        deformed
+          ? `    ${v}_geometry,`
+          : `    new THREE.${spec.ctor}(${spec.args.map(n).join(", ")}),`,
+      );
       lines.push(`    new THREE.MeshStandardMaterial({`);
       lines.push(`      color: "#${mat.color.getHexString()}",`);
       lines.push(`      metalness: ${n(mat.metalness)},`);
